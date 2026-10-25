@@ -28,3 +28,7 @@ desktop.ini
 # Logs and temporary files
 *.log
 *.tmp
+
+# Local command scripts (keep the Maven wrapper)
+*.cmd
+!backend/mvnw.cmd
