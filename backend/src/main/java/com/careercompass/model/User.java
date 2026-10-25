@@ -12,6 +12,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -19,10 +20,11 @@ import java.time.Instant;
 @Entity
 @Table(name = "users",
     uniqueConstraints = {
-        @jakarta.persistence.UniqueConstraint(columnNames = "email")
+        @UniqueConstraint(name = "uk_users_email", columnNames = "email")
     })
 
 public class User {
+    public static final String EMAIL_UNIQUE_CONSTRAINT = "uk_users_email";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -56,7 +58,7 @@ public class User {
         return email;
     }
     
-    public String getHashedassword() {
+    public String getHashedPassword() {
         return hashedPassword;
     }
 
