@@ -1,21 +1,17 @@
 package com.careercompass.model;
 
-import java.util.ArrayList;
-import java.util.List;
+
 
 import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
+
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import java.time.Instant;
 @Entity
 @Table(name = "users",
@@ -65,6 +61,16 @@ public class User {
     public Instant getCreatedAt() {
         return createdAt;
     }
+    
+    public String getName() {
+        return name;
+    }
+    
+
+    public Long getId() {
+        return id;
+    }
+
     public String validateText(String text) {
         if (text == null || text.trim().isEmpty()) {
             throw new IllegalArgumentException("Text cannot be null or empty");
@@ -80,7 +86,7 @@ public class User {
         if (!email.matches(emailRegex)) {
             throw new IllegalArgumentException("Invalid email format");
         }
-        return email.trim();
+        return email.trim().toLowerCase();
     }
     
     

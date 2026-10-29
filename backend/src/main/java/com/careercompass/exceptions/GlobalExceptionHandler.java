@@ -20,6 +20,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(e.getMessage());
     }
 
+    @ExceptionHandler({InvalidEmailException.class, InvalidPasswordException.class})
+    public ResponseEntity<String> handleInvalidCredentialsException(RuntimeException e) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<String> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
         String message = e.getBindingResult().getFieldErrors().stream()
@@ -28,5 +33,6 @@ public class GlobalExceptionHandler {
                 .orElse("Request validation failed");
         return ResponseEntity.badRequest().body(message);
     }
+
 
 }

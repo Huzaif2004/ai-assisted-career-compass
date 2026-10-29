@@ -7,30 +7,39 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.careercompass.dto.LoginRequest;
+import com.careercompass.dto.LoginResponse;
 import com.careercompass.dto.RegisterRequest;
+import com.careercompass.exceptions.InvalidEmailException;
+import com.careercompass.exceptions.InvalidPasswordException;
 import com.careercompass.exceptions.UserAlreadyExistsException;
+
 import com.careercompass.model.User;
 import com.careercompass.repository.UserRepository;
+import com.careercompass.security.JwtUtil;
 import com.careercompass.service.UserService;
 @Service 
 public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;  
     private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
 
-    public UserServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtUtil jwtUtil) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtUtil = jwtUtil;
     }
 
     @Override
     public void registerUser(RegisterRequest request) {
         // Check if the email is already registered
-        if (userRepository.findByEmail(request.email()).isPresent()) {
+        String emailLowercase=request.email().toLowerCase(Locale.ROOT);
+        if (userRepository.findByEmail(emailLowercase).isPresent()) {
             throw new UserAlreadyExistsException("Email is already registered");
         }
 
         // Create a new User entity and save it to the database
-        User user = new User(request.name(), request.email(), passwordEncoder.encode(request.password()));
+        User user = new User(request.name(), emailLowercase, passwordEncoder.encode(request.password()));
        
         try{
 
@@ -59,6 +68,23 @@ public class UserServiceImpl implements UserService {
             }
         }
         return false;
+    }
+
+    @Override
+    public LoginResponse loginUser(LoginRequest request) {
+        if (request.email() == null || request.password() == null) {
+            throw new IllegalArgumentException("Email and password must not be null");
+        }
+        String emailLowercase=request.email().toLowerCase(Locale.ROOT);
+        User user = userRepository.findByEmail(emailLowercase)
+                .orElseThrow(() -> new InvalidEmailException("Invalid email"));
+
+        if (!passwordEncoder.matches(request.password(),user.getHashedPassword())) {
+            throw new InvalidPasswordException("Invalid password");
+        }
+
+        String jwtToken = jwtUtil.generateAccessToken(user.getId(), user.getEmail());
+        return new LoginResponse(jwtToken, user.getEmail(), user.getName());
     }
     
 }

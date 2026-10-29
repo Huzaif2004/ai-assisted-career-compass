@@ -2,6 +2,8 @@ package com.careercompass.controller;
 
 import org.springframework.web.bind.annotation.RestController;
 
+import com.careercompass.dto.LoginRequest;
+import com.careercompass.dto.LoginResponse;
 import com.careercompass.dto.RegisterRequest;
 import com.careercompass.service.UserService;
 
@@ -15,7 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 
 @RestController 
-@RequestMapping ("/api/users")
+@RequestMapping ("/api/auth")
 public class UserController {
 
     private final UserService userService;
@@ -29,6 +31,14 @@ public class UserController {
         userService.registerUser(request);
         return ResponseEntity.status(HttpStatus.CREATED).body("User registered successfully");
     }
+
+    @PostMapping("/login")
+    public ResponseEntity<LoginResponse> loginUser(@Valid @RequestBody LoginRequest request) {
+        
+        return ResponseEntity.ok(userService.loginUser(request));
+        
+    }
+    
     
     
 }
