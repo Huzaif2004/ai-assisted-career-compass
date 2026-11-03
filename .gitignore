@@ -11,6 +11,7 @@
 **/application-*.yml
 **/application-*.yaml
 **/application-local.properties
+**/application.properties
 
 # IDE files
 .idea/
