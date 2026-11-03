@@ -8,6 +8,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.careercompass.service.TokenBlackListService;
+
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -19,9 +21,11 @@ import jakarta.servlet.http.HttpServletResponse;
 public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
+    private final TokenBlackListService blackListService;
 
-    public JwtFilter(JwtUtil jwtUtil) {
+    public JwtFilter(JwtUtil jwtUtil, TokenBlackListService blackListService) {
         this.jwtUtil = jwtUtil;
+        this.blackListService = blackListService;
     }
 
     @Override
@@ -30,12 +34,16 @@ public class JwtFilter extends OncePerRequestFilter {
             FilterChain chain) throws ServletException, IOException {
 
         String header = request.getHeader("Authorization");
-
+        
         if (header != null && header.startsWith("Bearer ")) {
-            String token = header.substring(7); // remove "Bearer "
+            String token = header.substring(7); 
             try {
                 Claims claims = jwtUtil.parse(token);
 
+                if (blackListService.isBlackListed(claims.getId())) {
+                    chain.doFilter(request, response); // stays unauthenticated
+                    return;
+                }
                 var authentication = new UsernamePasswordAuthenticationToken(
                         claims.getSubject(), // principal = user id as a string
                         null,
@@ -48,6 +56,6 @@ public class JwtFilter extends OncePerRequestFilter {
             }
         }
 
-        chain.doFilter(request, response); // always continue down the chain
+        chain.doFilter(request, response); 
     }
 }
