@@ -7,11 +7,14 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 
 import com.careercompass.dto.RotationResult;
@@ -25,6 +28,29 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 
     private final StringRedisTemplate redis;
     private final Duration ttl;
+
+    private static final RedisScript<String> ROTATE_SCRIPT = new DefaultRedisScript<>("""
+            local value = redis.call('GET', KEYS[1])
+            if not value then
+              return 'INVALID'
+            end
+
+            local userId, familyId = string.match(value, '^([^:]+):(.+)$')
+            local familyKey = ARGV[3] .. familyId
+            local current = redis.call('GET', familyKey)
+
+            if current ~= ARGV[1] then
+              if current then
+                redis.call('DEL', ARGV[4] .. current)
+              end
+              redis.call('DEL', familyKey)
+              return 'REUSED'
+            end
+
+            redis.call('SET', KEYS[2], value, 'EX', ARGV[5])
+            redis.call('SET', familyKey, ARGV[2], 'EX', ARGV[5])
+            return 'OK:' .. userId
+            """, String.class);
 
     public RefreshTokenServiceImpl(StringRedisTemplate redis,
             @Value("${jwt.refresh-ttl-days}") long ttlDays) {
@@ -48,29 +74,24 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
             return Optional.empty();
         }
 
-        // 1. Is it a token we issued?
         String oldHash = hash(raw);
-        String value = redis.opsForValue().get(TOKEN_KEY + oldHash); // "42:familyId"
-        if (value == null) {
-            return Optional.empty(); // fake or expired(after 7 days the record is gone)
-        }
-        String[] parts = value.split(":", 2);
-        Long userId = Long.valueOf(parts[0]);
-        String familyId = parts[1];
-
-        // 2. Is it the CURRENT token of its family?
-        String current = redis.opsForValue().get(FAMILY_KEY + familyId);
-        if (!oldHash.equals(current)) {
-            redis.delete(FAMILY_KEY + familyId); // reuse: break the chain
-            return Optional.empty();
-        }
-
-        // 3. Create the next token and move the pointer
         String newRaw = newRawToken();
         String newHash = hash(newRaw);
-        redis.opsForValue().set(TOKEN_KEY + newHash, value, ttl); // new token record
-        redis.opsForValue().set(FAMILY_KEY + familyId, newHash, ttl); // pointer: old -> new
 
+        String result = redis.execute(
+                ROTATE_SCRIPT,
+                List.of(TOKEN_KEY + oldHash, TOKEN_KEY + newHash), // KEYS[1], KEYS[2]
+                oldHash, // ARGV[1]
+                newHash, // ARGV[2]
+                FAMILY_KEY, // ARGV[3]
+                TOKEN_KEY, // ARGV[4]
+                String.valueOf(ttl.getSeconds())); // ARGV[5]
+
+        if (result == null || !result.startsWith("OK:")) {
+            return Optional.empty(); // INVALID or REUSED -> controller returns 401
+        }
+
+        Long userId = Long.valueOf(result.substring(3));
         return Optional.of(new RotationResult(userId, newRaw));
     }
 
